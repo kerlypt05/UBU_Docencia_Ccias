@@ -10,7 +10,8 @@ Las fuentes en claro NO se guardan en el repositorio: se conservan aparte.
 Uso:
     python3 herramientas/cifrar_paginas.py --fuentes RUTA_FUENTES --salida . --clave "la-clave"
 
-Cifra todos los .html de RUTA_FUENTES y los escribe en la misma ruta relativa dentro de --salida.
+Cifra todos los .html de RUTA_FUENTES (salvo carpetas y archivos que empiezan por «_») y los escribe
+en la misma ruta relativa dentro de --salida. La puerta muestra el logo de assets/logo_ubu.png.
 Para cambiar la clave de curso, se vuelve a ejecutar con la clave nueva y se suben los archivos.
 Requiere: pip install cryptography
 """
@@ -34,10 +35,8 @@ PUERTA = """<!doctype html>
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--desk);color:var(--ink);
        font-family:'Source Sans 3','Segoe UI',Calibri,Arial,sans-serif;font-size:16px;line-height:1.5;padding:24px 16px}
   .box{width:100%;max-width:420px;background:var(--paper);padding:30px 28px 24px;box-shadow:0 1px 3px rgba(0,0,0,.12);border-top:4px solid var(--red)}
-  .brand{font-family:Georgia,'Times New Roman',serif;line-height:1}
-  .brand .u{display:block;font-size:17px;letter-spacing:.02em}
-  .brand .b{display:block;font-size:24px;font-weight:700;letter-spacing:.03em}
-  .brand small{font-size:14px;font-weight:400;margin-right:3px}
+  .logo{display:block;width:100%;max-width:300px;height:auto}
+  .prof{margin:10px 0 0;font-size:14px;font-weight:700;color:var(--ink)}
   h1{color:var(--red);font-size:20px;line-height:1.25;margin:22px 0 4px;text-wrap:balance}
   p{margin:0 0 16px;color:var(--soft);font-size:15px}
   label{display:block;font-weight:700;margin-bottom:6px}
@@ -55,7 +54,8 @@ PUERTA = """<!doctype html>
 </head>
 <body>
 <main class="box">
-  <div class="brand"><span class="u">UNIVERSIDAD</span><span class="b"><small>DE</small>BURGOS</span></div>
+  <img class="logo" src="__RAIZ__assets/logo_ubu.png" alt="Universidad de Burgos" width="640" height="244">
+  <p class="prof">Prof. Kerly Palacios</p>
   <h1>__TITULO__</h1>
   <p>Panificación y Pastelería (9057). Acceso con la clave publicada en UBUVirtual.</p>
   <form id="f" autocomplete="on">
@@ -123,11 +123,11 @@ def cifrar(texto, clave):
     return {"v": 1, "i": ITERACIONES, "s": e(sal), "n": e(nonce), "c": e(ct)}
 
 
-def puerta(texto, clave):
+def puerta(texto, clave, raiz=""):
     m = re.search(r"<title>(.*?)</title>", texto, re.S)
     titulo = html.escape(html.unescape(m.group(1).strip())) if m else "Recurso de la asignatura"
     datos = json.dumps(cifrar(texto, clave), separators=(",", ":"))
-    return PUERTA.replace("__TITULO__", titulo).replace("__DATOS__", datos)
+    return PUERTA.replace("__TITULO__", titulo).replace("__RAIZ__", raiz).replace("__DATOS__", datos)
 
 
 def main():
@@ -137,9 +137,10 @@ def main():
     ap.add_argument("--clave", required=True, help="clave común de acceso")
     a = ap.parse_args()
     n = 0
-    for raiz, _, archivos in os.walk(a.fuentes):
+    for raiz, carpetas, archivos in os.walk(a.fuentes):
+        carpetas[:] = [c for c in carpetas if not c.startswith(("_", "."))]   # _base, etc.: uso interno
         for nom in sorted(archivos):
-            if not nom.endswith(".html"):
+            if not nom.endswith(".html") or nom.startswith("_"):
                 continue
             rel = os.path.relpath(os.path.join(raiz, nom), a.fuentes)
             dest = os.path.join(a.salida, rel)
@@ -147,7 +148,7 @@ def main():
             with open(os.path.join(raiz, nom), encoding="utf-8") as f:
                 texto = f.read()
             with open(dest, "w", encoding="utf-8") as f:
-                f.write(puerta(texto, a.clave))
+                f.write(puerta(texto, a.clave, "../" * rel.replace(os.sep, "/").count("/")))
             print("cifrada:", rel); n += 1
     print(f"{n} páginas cifradas.")
 
