@@ -123,11 +123,16 @@ def cifrar(texto, clave):
     return {"v": 1, "i": ITERACIONES, "s": e(sal), "n": e(nonce), "c": e(ct)}
 
 
-def puerta(texto, clave, raiz=""):
+TEMAS = {"rojo": ("#c00000", "#8f1d1d"), "azul": ("#1d4f91", "#133a6c")}
+
+
+def puerta(texto, clave, raiz="", tema="rojo"):
     m = re.search(r"<title>(.*?)</title>", texto, re.S)
     titulo = html.escape(html.unescape(m.group(1).strip())) if m else "Recurso de la asignatura"
     datos = json.dumps(cifrar(texto, clave), separators=(",", ":"))
-    return PUERTA.replace("__TITULO__", titulo).replace("__RAIZ__", raiz).replace("__DATOS__", datos)
+    p, o = TEMAS[tema]
+    html_ = PUERTA.replace("--red:#c00000;--red-dark:#8f1d1d;", f"--red:{p};--red-dark:{o};")
+    return html_.replace("__TITULO__", titulo).replace("__RAIZ__", raiz).replace("__DATOS__", datos)
 
 
 def main():
@@ -135,6 +140,7 @@ def main():
     ap.add_argument("--fuentes", required=True, help="carpeta con las páginas en claro (fuera del repositorio)")
     ap.add_argument("--salida", required=True, help="carpeta del repositorio")
     ap.add_argument("--clave", required=True, help="clave común de acceso")
+    ap.add_argument("--tema", choices=sorted(TEMAS), default="rojo", help="color de la puerta: rojo (docencia) o azul (prácticas)")
     a = ap.parse_args()
     n = 0
     for raiz, carpetas, archivos in os.walk(a.fuentes):
@@ -148,7 +154,7 @@ def main():
             with open(os.path.join(raiz, nom), encoding="utf-8") as f:
                 texto = f.read()
             with open(dest, "w", encoding="utf-8") as f:
-                f.write(puerta(texto, a.clave, "../" * rel.replace(os.sep, "/").count("/")))
+                f.write(puerta(texto, a.clave, "../" * rel.replace(os.sep, "/").count("/"), a.tema))
             print("cifrada:", rel); n += 1
     print(f"{n} páginas cifradas.")
 
